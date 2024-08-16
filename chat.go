@@ -1,10 +1,13 @@
 package chatgpt
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"strings"
 
 	chatgpt_errors "github.com/ayush6624/go-chatgpt/utils"
 )
@@ -12,26 +15,26 @@ import (
 type ChatGPTModel string
 
 const (
-	GPT35Turbo        ChatGPTModel = "gpt-3.5-turbo"
+	GPT35Turbo ChatGPTModel = "gpt-3.5-turbo"
 
 	// Deprecated: Use gpt-3.5-turbo-0613 instead, model will discontinue on 09/13/2023
-	GPT35Turbo0301    ChatGPTModel = "gpt-3.5-turbo-0301"
-	
+	GPT35Turbo0301 ChatGPTModel = "gpt-3.5-turbo-0301"
+
 	GPT35Turbo0613    ChatGPTModel = "gpt-3.5-turbo-0613"
 	GPT35Turbo16k     ChatGPTModel = "gpt-3.5-turbo-16k"
 	GPT35Turbo16k0613 ChatGPTModel = "gpt-3.5-turbo-16k-0613"
 	GPT4              ChatGPTModel = "gpt-4"
-	
+
 	// Deprecated: Use gpt-4-0613 instead, model will discontinue on 09/13/2023
-	GPT4_0314         ChatGPTModel = "gpt-4-0314"
-	
-	GPT4_0613         ChatGPTModel = "gpt-4-0613"
-	GPT4_32k          ChatGPTModel = "gpt-4-32k"
-	
+	GPT4_0314 ChatGPTModel = "gpt-4-0314"
+
+	GPT4_0613 ChatGPTModel = "gpt-4-0613"
+	GPT4_32k  ChatGPTModel = "gpt-4-32k"
+
 	// Deprecated: Use gpt-4-32k-0613 instead, model will discontinue on 09/13/2023
-	GPT4_32k_0314     ChatGPTModel = "gpt-4-32k-0314"
-	
-	GPT4_32k_0613     ChatGPTModel = "gpt-4-32k-0613"
+	GPT4_32k_0314 ChatGPTModel = "gpt-4-32k-0314"
+
+	GPT4_32k_0613 ChatGPTModel = "gpt-4-32k-0613"
 )
 
 type ChatGPTModelRole string
@@ -83,6 +86,8 @@ type ChatCompletionRequest struct {
 	// (Optional)
 	// A unique identifier representing your end-user, which can help OpenAI to monitor and detect abuse
 	User string `json:"user,omitempty"`
+
+	Stream bool `json:"stream"`
 }
 
 type ChatMessage struct {
@@ -96,6 +101,8 @@ type ChatResponse struct {
 	CreatedAt int64                `json:"created_at"`
 	Choices   []ChatResponseChoice `json:"choices"`
 	Usage     ChatResponseUsage    `json:"usage"`
+
+	StreamCh <-chan string
 }
 
 type ChatResponseChoice struct {
@@ -142,14 +149,65 @@ func (c *Client) Send(ctx context.Context, req *ChatCompletionRequest) (*ChatRes
 	if err != nil {
 		return nil, err
 	}
-	defer res.Body.Close()
 
 	var chatResponse ChatResponse
-	if err := json.NewDecoder(res.Body).Decode(&chatResponse); err != nil {
-		return nil, err
+	if req.Stream {
+		streamCh := make(chan string)
+		chatResponse.StreamCh = streamCh
+
+		go func() {
+			scanner := bufio.NewScanner(res.Body)
+			defer res.Body.Close()
+			defer close(streamCh)
+
+			for scanner.Scan() {
+				line := scanner.Text()
+				delta := deltaFromData(line)
+
+				select {
+				case streamCh <- delta:
+				case <-ctx.Done():
+					return
+				}
+			}
+
+			if err := scanner.Err(); err != nil {
+				fmt.Println("sending streamed request error", err)
+			}
+		}()
+
+	} else {
+		defer res.Body.Close()
+		if err := json.NewDecoder(res.Body).Decode(&chatResponse); err != nil {
+			return nil, err
+		}
 	}
 
 	return &chatResponse, nil
+}
+
+func deltaFromData(dataString string) string {
+	prefix := "data: "
+	if strings.HasPrefix(dataString, prefix) {
+		jsonString := dataString[len(prefix):]
+		var dataDict map[string]any
+		_ = json.Unmarshal([]byte(jsonString), &dataDict)
+		if dataDict == nil {
+			return ""
+		}
+		choices := dataDict["choices"].([]any)
+		if len(choices) == 0 {
+			return ""
+		}
+		choice := choices[0].(map[string]any)
+		delta := choice["delta"].(map[string]any)
+		content, _ := delta["content"].(string)
+
+		return content
+
+	} else {
+		return ""
+	}
 }
 
 func validate(req *ChatCompletionRequest) error {
