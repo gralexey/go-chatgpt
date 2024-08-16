@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"strings"
 
-	chatgpt_errors "github.com/ayush6624/go-chatgpt/utils"
+	chatgpt_errors "github.com/gralexey/go-chatgpt/utils"
 )
 
 type ChatGPTModel string

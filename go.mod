@@ -1,4 +1,4 @@
-module github.com/ayush6624/go-chatgpt
+module github.com/gralexey/go-chatgpt
 
 go 1.20
 
