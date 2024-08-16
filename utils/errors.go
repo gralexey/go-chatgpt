@@ -12,6 +12,9 @@ var (
 	// ErrNoMessages is returned when no messages are provided
 	ErrNoMessages = errors.New("no messages provided")
 
+	// ErrNoImagePrompt is returned when no mesimage prompt is provided
+	ErrNoImagePrompt = errors.New("no image prompt provided")
+
 	// ErrInvalidRole is returned when the role is invalid
 	ErrInvalidRole = errors.New("invalid role. Only `user`, `system` and `assistant` are supported")
 
