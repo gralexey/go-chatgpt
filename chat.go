@@ -216,22 +216,6 @@ func validate(req *ChatCompletionRequest) error {
 		return chatgpt_errors.ErrNoMessages
 	}
 
-	isAllowed := false
-
-	allowedModels := []ChatGPTModel{
-		GPT35Turbo, GPT35Turbo0301, GPT35Turbo0613, GPT35Turbo16k, GPT35Turbo16k0613, GPT4, GPT4_0314, GPT4_0613, GPT4_32k, GPT4_32k_0314, GPT4_32k_0613,
-	}
-
-	for _, model := range allowedModels {
-		if req.Model == model {
-			isAllowed = true
-		}
-	}
-
-	if !isAllowed {
-		return chatgpt_errors.ErrInvalidModel
-	}
-
 	for _, message := range req.Messages {
 		if message.Role != ChatGPTModelRoleUser && message.Role != ChatGPTModelRoleSystem && message.Role != ChatGPTModelRoleAssistant {
 			return chatgpt_errors.ErrInvalidRole
