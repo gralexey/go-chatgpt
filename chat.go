@@ -24,6 +24,7 @@ const (
 	GPT35Turbo16k     ChatGPTModel = "gpt-3.5-turbo-16k"
 	GPT35Turbo16k0613 ChatGPTModel = "gpt-3.5-turbo-16k-0613"
 	GPT4              ChatGPTModel = "gpt-4"
+	GPT4Omini         ChatGPTModel = "gpt-4o-mini"
 
 	// Deprecated: Use gpt-4-0613 instead, model will discontinue on 09/13/2023
 	GPT4_0314 ChatGPTModel = "gpt-4-0314"
